@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pong - AI vs. PvP</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        canvas {
+            background-color: #fff;
+            display: block;
+        }
+
+        #menu, #difficultyMenu {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: white;
+            font-size: 24px;
+        }
+
+        button {
+            padding: 10px 20px;
+            font-size: 18px;
+            cursor: pointer;
+            background-color: #333;
+            color: white;
+            border: none;
+            margin: 10px;
+        }
+
+        button:hover {
+            background-color: #444;
+        }
+    </style>
+</head>
+<body>
+
+<canvas id="pongCanvas"></canvas>
+<div id="menu">
+    <h2>Select Mode</h2>
+    <button id="pvpButton">Player vs Player</button>
+    <button id="aiButton">Player vs AI</button>
+</div>
+
+<div id="difficultyMenu" style="display: none;">
+    <h2>Select Difficulty</h2>
+    <button id="easyButton">Easy</button>
+    <button id="mediumButton">Medium</button>
+    <button id="hardButton">Hard</button>
+</div>
+
+<script>
+    const canvas = document.getElementById('pongCanvas');
+    const ctx = canvas.getContext('2d');
+    const menu = document.getElementById('menu');
+    const difficultyMenu = document.getElementById('difficultyMenu');
+    const pvpButton = document.getElementById('pvpButton');
+    const aiButton = document.getElementById('aiButton');
+    const easyButton = document.getElementById('easyButton');
+    const mediumButton = document.getElementById('mediumButton');
+    const hardButton = document.getElementById('hardButton');
+
+    canvas.width = 800;
+    canvas.height = 400;
+
+    const paddleWidth = 10;
+    const paddleHeight = 100;
+    const ballRadius = 10;
+
+    let ball = { x: canvas.width / 2, y: canvas.height / 2, dx: 5, dy: 5, radius: ballRadius };
+    let leftPaddle = { x: 0, y: canvas.height / 2 - paddleHeight / 2, width: paddleWidth, height: paddleHeight, dy: 0 };
+    let rightPaddle = { x: canvas.width - paddleWidth, y: canvas.height / 2 - paddleHeight / 2, width: paddleWidth, height: paddleHeight, dy: 0 };
+
+    let leftScore = 0;
+    let rightScore = 0;
+
+    let gameMode = null; // 'pvp' or 'ai'
+    let aiDifficulty = 'medium'; // 'easy', 'medium', 'hard'
+
+    // Controls for left paddle (W and S)
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'w') leftPaddle.dy = -6;
+        if (e.key === 's') leftPaddle.dy = 6;
+
+        // PvP Controls for right paddle (Player 2 using arrow keys)
+        if (gameMode === 'pvp') {
+            if (e.key === 'ArrowUp') rightPaddle.dy = -6;
+            if (e.key === 'ArrowDown') rightPaddle.dy = 6;
+        }
+    });
+
+    document.addEventListener('keyup', (e) => {
+        if (e.key === 'w' || e.key === 's') leftPaddle.dy = 0;
+
+        // PvP Controls for right paddle (Player 2 using arrow keys)
+        if (gameMode === 'pvp') {
+            if (e.key === 'ArrowUp' || e.key === 'ArrowDown') rightPaddle.dy = 0;
+        }
+    });
+
+    // AI Movement based on difficulty
+    function moveAI() {
+        const aiSpeed = aiDifficulty === 'easy' ? 2 : aiDifficulty === 'medium' ? 4 : 6;
+        if (ball.y > rightPaddle.y + rightPaddle.height / 2) {
+            rightPaddle.dy = aiSpeed;
+        } else if (ball.y < rightPaddle.y + rightPaddle.height / 2) {
+            rightPaddle.dy = -aiSpeed;
+        } else {
+            rightPaddle.dy = 0;
+        }
+
+        rightPaddle.y += rightPaddle.dy;
+
+        // Prevent AI paddle from going out of bounds
+        if (rightPaddle.y < 0) rightPaddle.y = 0;
+        if (rightPaddle.y + rightPaddle.height > canvas.height) rightPaddle.y = canvas.height - rightPaddle.height;
+    }
+
+    // Move paddles based on controls
+    function movePaddles() {
+        leftPaddle.y += leftPaddle.dy;
+
+        // Prevent paddles from going out of bounds
+        if (leftPaddle.y < 0) leftPaddle.y = 0;
+        if (leftPaddle.y + leftPaddle.height > canvas.height) leftPaddle.y = canvas.height - leftPaddle.height;
+
+        if (gameMode === 'ai') {
+            moveAI(); // AI controls right paddle
+        } else if (gameMode === 'pvp') {
+            // Player 2 controls right paddle using arrow keys
+            rightPaddle.y += rightPaddle.dy;
+
+            // Prevent right paddle from going out of bounds
+            if (rightPaddle.y < 0) rightPaddle.y = 0;
+            if (rightPaddle.y + rightPaddle.height > canvas.height) rightPaddle.y = canvas.height - rightPaddle.height;
+        }
+    }
+
+    function drawPaddle(paddle) {
+        ctx.fillStyle = 'black';
+        ctx.fillRect(paddle.x, paddle.y, paddle.width, paddle.height);
+    }
+
+    function drawBall() {
+        ctx.fillStyle = 'black';
+        ctx.beginPath();
+        ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    function moveBall() {
+        ball.x += ball.dx;
+        ball.y += ball.dy;
+
+        // Ball collision with top and bottom walls
+        if (ball.y - ball.radius < 0 || ball.y + ball.radius > canvas.height) {
+            ball.dy = -ball.dy;
+        }
+
+        // Ball collision with paddles
+        if (ball.x - ball.radius < leftPaddle.x + leftPaddle.width && ball.y > leftPaddle.y && ball.y < leftPaddle.y + leftPaddle.height) {
+            ball.dx = -ball.dx;
+        }
+        if (ball.x + ball.radius > rightPaddle.x && ball.y > rightPaddle.y && ball.y < rightPaddle.y + rightPaddle.height) {
+            ball.dx = -ball.dx;
+        }
+
+        // Ball out of bounds
+        if (ball.x - ball.radius < 0) {
+            rightScore++;
+            resetBall();
+        }
+        if (ball.x + ball.radius > canvas.width) {
+            leftScore++;
+            resetBall();
+        }
+    }
+
+    function resetBall() {
+        ball.x = canvas.width / 2;
+        ball.y = canvas.height / 2;
+        ball.dx = -ball.dx;
+    }
+
+    function drawScores() {
+        ctx.font = '32px Arial';
+        ctx.fillStyle = 'black';
+        ctx.fillText(leftScore, canvas.width / 4, 50);
+        ctx.fillText(rightScore, 3 * canvas.width / 4, 50);
+    }
+
+    function update() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        drawPaddle(leftPaddle);
+        drawPaddle(rightPaddle);
+        drawBall();
+        drawScores();
+
+        moveBall();
+        movePaddles();
+
+        requestAnimationFrame(update);
+    }
+
+    // Show menu and hide game screen
+    function showMenu() {
+        menu.style.display = 'block';
+        canvas.style.display = 'none';
+        difficultyMenu.style.display = 'none';
+    }
+
+    // Show difficulty menu when AI is selected
+    function showDifficultyMenu() {
+        menu.style.display = 'none';
+        difficultyMenu.style.display = 'block';
+    }
+
+    // Hide difficulty menu and start the game
+    function startGame(mode, difficulty) {
+        gameMode = mode;
+        aiDifficulty = difficulty;
+        menu.style.display = 'none';
+        difficultyMenu.style.display = 'none';
+        canvas.style.display = 'block';
+        update();
+    }
+
+    // Event listeners for button clicks
+    pvpButton.addEventListener('click', () => startGame('pvp', 'medium'));
+    aiButton.addEventListener('click', showDifficultyMenu);
+
+    easyButton.addEventListener('click', () => startGame('ai', 'easy'));
+    mediumButton.addEventListener('click', () => startGame('ai', 'medium'));
+    hardButton.addEventListener('click', () => startGame('ai', 'hard'));
+
+    // Initial menu display
+    showMenu();
+</script>
+
+</body>
+</html>
