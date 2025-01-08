@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flappy Bird Game</title>
+    <style>
+        body { margin: 0; padding: 0; background-color: black; }
+        canvas { display: block; margin: 0 auto; background-color: #000; }
+
+        .score { 
+            color: white; 
+            font-size: 20px; 
+            position: fixed; 
+            top: 10px; 
+            left: 10px; 
+        }
+
+        /* Game Over screen styles */
+        #gameOverScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            color: white;
+            font-size: 40px;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+        }
+
+        #restartButton {
+            background-color: #28a745;
+            color: white;
+            padding: 10px 20px;
+            font-size: 20px;
+            cursor: pointer;
+            border: none;
+            margin-top: 20px;
+        }
+
+        #restartButton:hover {
+            background-color: #218838;
+        }
+
+        #backToTry1Button {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background-color: #dc3545;
+            color: white;
+            padding: 10px 20px;
+            font-size: 20px;
+            cursor: pointer;
+            border: none;
+        }
+
+        #backToTry1Button:hover {
+            background-color: #c82333;
+        }
+
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <div class="score" id="score">Score: 0</div>
+
+    <!-- Game Over screen overlay -->
+    <div id="gameOverScreen">
+        <div>
+            <div id="gameOverMessage">Game Over!</div>
+            <div id="finalScore">Final Score: 0</div>
+            <button id="restartButton" onclick="restartGame()">Restart</button>
+        </div>
+    </div>
+
+    <!-- Back to Try1 button -->
+    <button id="backToTry1Button" onclick="goBackToTry1()">Back to Home</button>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+
+        // Adjust canvas size to full screen
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Load images
+        const birdImg = new Image();
+        const bgImg = new Image();
+
+        birdImg.src = 'images/bird.png';  // Path to the bird image
+        bgImg.src = 'images/bg.gif';  // Path to the background image
+
+        // Game variables
+        let bird, tubes, score;
+        let leftPressed = false; // Initialize leftPressed flag
+        let rightPressed = false; // Initialize rightPressed flag
+        let gameOver = false;
+        const tubeWidth = 60;  // Width of the pipes
+        let gap = 200;  // Increase the gap between pipes
+        let tubeInterval = 2400; // Increase the interval between pipe generation to space them more
+        let tubeSpacing = 600; // Increase space between pipe sets (at least 2x the distance)
+
+        // Initialize necessary variables for the bird
+        function resetGame() {
+            bird = { 
+                x: canvas.width / 4, 
+                y: canvas.height / 2, 
+                width: 40,  // Visible bird width
+                height: 40, // Visible bird height
+                hitboxWidth: 30,  // Smaller hitbox width for collision detection
+                hitboxHeight: 30, // Smaller hitbox height for collision detection
+                gravity: 0.6, 
+                lift: -15, 
+                velocity: 0 
+            };
+            tubes = [];
+            score = 0;
+            gameOver = false;
+            document.getElementById('score').innerText = `Score: ${score}`;
+            hideGameOverScreen();  // Hide the game over screen when restarting
+        }
+
+        // Create tubes with random top height and bottom height based on gap
+        function createTube() {
+            const topHeight = Math.random() * (canvas.height - gap);  // Random height for top pipe
+            const bottomHeight = canvas.height - topHeight - gap;  // Bottom height is based on the gap
+            tubes.push({
+                x: canvas.width,
+                width: tubeWidth,
+                topHeight: topHeight,
+                bottomHeight: bottomHeight
+            });
+        }
+
+        // Draw the bird
+        function drawBird() {
+            ctx.drawImage(birdImg, bird.x, bird.y, bird.width, bird.height);
+        }
+
+        // Draw tubes (as rectangles, no image)
+        function drawTubes() {
+            tubes.forEach(tube => {
+                // Draw top pipe
+                ctx.fillStyle = 'green';
+                ctx.fillRect(tube.x, 0, tube.width, tube.topHeight);
+
+                // Draw bottom pipe (flipped upside down)
+                ctx.fillRect(tube.x, canvas.height - tube.bottomHeight, tube.width, tube.bottomHeight);
+            });
+        }
+
+        // Draw background
+        function drawBackground() {
+            ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+        }
+
+        // Move the bird
+        function moveBird() {
+            bird.velocity += bird.gravity;
+            bird.y += bird.velocity;
+
+            if (bird.y + bird.height > canvas.height) {
+                bird.y = canvas.height - bird.height;
+                bird.velocity = 0;
+            }
+        }
+
+        // Move tubes
+        function moveTubes() {
+            tubes.forEach(tube => {
+                tube.x -= 3;  // Move tubes to the left
+            });
+            tubes = tubes.filter(tube => tube.x + tube.width > 0);  // Remove off-screen tubes
+        }
+
+        // Check collision with tubes
+        function checkCollision() {
+            for (let i = 0; i < tubes.length; i++) {
+                const tube = tubes[i];
+
+                // Check if bird is within the range of the pipe width
+                if (bird.x + bird.hitboxWidth > tube.x && bird.x < tube.x + tube.width) {
+                    // Check if bird is colliding with top or bottom pipe using the smaller hitbox dimensions
+                    if (bird.y < tube.topHeight || bird.y + bird.hitboxHeight > canvas.height - tube.bottomHeight) {
+                        return true;
+                    }
+                }
+            }
+            return false;
+        }
+
+        // Update the score
+        function updateScore() {
+            tubes.forEach(tube => {
+                if (tube.x + tube.width < bird.x && !tube.scored) {
+                    score++;
+                    tube.scored = true;
+                    document.getElementById('score').innerText = `Score: ${score}`;
+                }
+            });
+        }
+
+        // Game loop
+        function gameLoop() {
+            if (gameOver) return;
+
+            ctx.clearRect(0, 0, canvas.width, canvas.height);  // Clear the canvas
+            drawBackground();
+            drawBird();
+            drawTubes();
+            moveBird();
+            moveTubes();
+            updateScore();
+
+            if (checkCollision()) {
+                gameOver = true;
+                showGameOverScreen();
+                return;
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // Event listener for bird movement (flap)
+        document.addEventListener("keydown", (e) => {
+            if (e.key === " " && !gameOver) { // Space bar to make the bird flap
+                bird.velocity = bird.lift;
+            }
+        });
+
+        // Game Over screen functions
+        function showGameOverScreen() {
+            document.getElementById('gameOverScreen').style.display = 'flex';
+            document.getElementById('finalScore').innerText = `Final Score: ${score}`;
+        }
+
+        function hideGameOverScreen() {
+            document.getElementById('gameOverScreen').style.display = 'none';
+        }
+
+        function restartGame() {
+            resetGame();
+            gameLoop();
+        }
+
+        function goBackToTry1() {
+            window.location.href = "try1.html";
+        }
+
+        // Start the game
+        resetGame();
+        gameLoop();
+
+        // Create a new tube every "tubeInterval" milliseconds (slower interval between sets of pipes)
+        setInterval(createTube, tubeInterval);
+
+    </script>
+</body>
+</html>
