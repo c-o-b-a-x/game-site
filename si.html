@@ -214,7 +214,7 @@
             const currentTime = Date.now();
             if (currentTime - lastShotTime >= shootCooldown) {
                 bullets.push({ x: spaceship.x + spaceship.width / 2, y: spaceship.y, radius: canvas.width / 150, speed: canvas.width / 150 });
-                lastShotTime = currentTime;
+                 shootCooldown = 200;
             }
         }
 
